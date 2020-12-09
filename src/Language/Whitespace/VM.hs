@@ -1,7 +1,10 @@
+{-# LANGUAGE DeriveGeneric #-}
+
 module Language.Whitespace.VM where
 
 import Language.Whitespace.Tokens
 
+import GHC.Generics (Generic)
 import Data.Array
 import System.IO
 import System.Random
@@ -29,16 +32,16 @@ data Instruction =
      | ReadChar
      | ReadNum
      | End
-   deriving (Show,Eq)
+   deriving (Show,Eq,Generic)
 
 data Op = Plus | Minus | Times | Divide | Modulo
-   deriving (Show,Eq)
+   deriving (Show,Eq,Generic)
 
 data Test = Zero | Negative
-   deriving (Show,Eq)
+   deriving (Show,Eq,Generic)
 
 newtype Label = LabelId { labelId :: [Bool] }
-    deriving (Show,Eq)
+    deriving (Show,Eq,Generic)
 
 type Loc = Integer
 

@@ -106,6 +106,38 @@ parse (B:C:B:B:xs) = ReadNum:(parse xs)
 
 parse _ = error "Unrecognised input"
 
+unParse :: Instruction -> [Token] -> [Token]
+unParse (Push arg)          c = A:A:unParseNumber arg c
+unParse Dup                 c = A:C:A:c
+unParse (Ref arg)           c = A:B:A:unParseNumber arg c
+unParse Shuffle             c = A:B:B:A:c
+unParse (Slide arg)         c = A:B:C:unParseNumber arg c
+unParse Swap                c = A:C:B:c
+unParse Discard             c = A:C:C:c
+
+unParse (Infix Plus)        c = B:A:A:A:c
+unParse (Infix Minus)       c = B:A:A:B:c
+unParse (Infix Times)       c = B:A:A:C:c
+unParse (Infix Divide)      c = B:A:B:A:c
+unParse (Infix Modulo)      c = B:A:B:B:c
+
+unParse Store               c = B:B:A:c
+unParse Retrieve            c = B:B:B:c
+
+unParse (Label label)       c = C:A:A:unParseLabel label c
+unParse (Call label)        c = C:A:B:unParseLabel label c
+unParse (Jump label)        c = C:A:C:unParseLabel label c
+unParse (If Zero label)     c = C:B:A:unParseLabel label c
+unParse (If Negative label) c = C:B:B:unParseLabel label c
+unParse Return              c = C:B:C:c
+unParse End                 c = C:C:C:c
+
+unParse OutputChar          c = B:C:A:A:c
+unParse OutputNum           c = B:C:A:B:c
+unParse ReadChar            c = B:C:B:A:c
+unParse ReadNum             c = B:C:B:B:c
+
+
 parseNumber :: Num x => [Token] -> (x, [Token])
 parseNumber ts = parseNum' ts []
   where
@@ -128,10 +160,23 @@ makeNumber t
      makeNumber' (A:rest) pow = (makeNumber' rest (pow*2))
      makeNumber' (B:rest) pow = pow + (makeNumber' rest (pow*2))
 
-makeString :: [Token] -> String
-makeString [] = ""
-makeString (t:ts) = (show t)++(makeString ts)
-{-
-    let fst = take 8 ts in
-    let rest = drop 8 ts in
-    (toEnum (makeNumber fst)):(makeString rest) -}
+
+unParseNumber :: Integral a => a -> [Token] -> [Token]
+unParseNumber i c =
+  if i < 0 
+    then B : writeNumber (negate i) c
+    else A : writeNumber i c
+  where          
+    writeNumber n c = writeNumber' n [C] ++ c
+    writeNumber' 0 acc = acc
+    writeNumber' i acc = 
+      let (d, m) = i `divMod` 2
+      in writeNumber' d $ (if m == 0 then A else B) : acc
+
+unParseLabel :: Label -> [Token] -> [Token]
+unParseLabel s = writeLabel' (labelId s)
+  where
+    writeLabel' []           c = C:c
+    writeLabel' (False:rest) c = A:writeLabel' rest c
+    writeLabel' (True:rest)  c = B:writeLabel' rest c
+
