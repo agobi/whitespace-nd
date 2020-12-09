@@ -22,9 +22,9 @@
 
 module Main where
 
-import Input
-import VM
-import Tokens
+import Language.Whitespace.Input
+import Language.Whitespace.VM
+import Language.Whitespace.Tokens
 
 import System.Environment(getArgs)
 

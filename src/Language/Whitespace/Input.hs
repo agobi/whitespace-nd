@@ -1,7 +1,7 @@
-module Input where
+module Language.Whitespace.Input where
 
-import VM
-import Tokens
+import Language.Whitespace.VM
+import Language.Whitespace.Tokens
 
 {- Input to the whitespace VM.
    For convenience, three input characters 
@@ -85,15 +85,15 @@ parse (B:A:B:B:xs) = (Infix Modulo):(parse xs)
 parse (B:B:A:xs) = Store:(parse xs)
 parse (B:B:B:xs) = Retrieve:(parse xs)
 
-parse (C:A:A:xs) = let (string,rest) = parseString xs in
+parse (C:A:A:xs) = let (string,rest) = parseLabel xs in
 		    (Label string):(parse rest)
-parse (C:A:B:xs) = let (string,rest) = parseString xs in
+parse (C:A:B:xs) = let (string,rest) = parseLabel xs in
 		    (Call string):(parse rest)
-parse (C:A:C:xs) = let (string,rest) = parseString xs in
+parse (C:A:C:xs) = let (string,rest) = parseLabel xs in
 		    (Jump string):(parse rest)
-parse (C:B:A:xs) = let (string,rest) = parseString xs in
+parse (C:B:A:xs) = let (string,rest) = parseLabel xs in
 		    (If Zero string):(parse rest)
-parse (C:B:B:xs) = let (string,rest) = parseString xs in
+parse (C:B:B:xs) = let (string,rest) = parseLabel xs in
 		    (If Negative string):(parse rest)
 
 parse (C:B:C:xs) = Return:(parse xs)
@@ -112,18 +112,19 @@ parseNumber ts = parseNum' ts []
     parseNum' (C:rest) acc = (makeNumber acc,rest)
     parseNum' (x:rest) acc = parseNum' rest (x:acc)
 
-parseString :: [Token] -> (String, [Token])
-parseString ts = parseStr' ts []
+parseLabel :: [Token] -> (Label, [Token])
+parseLabel ts = parseLabel' ts []
   where
-    parseStr' (C:rest) acc = (makeString acc,rest)
-    parseStr' (x:rest) acc = parseStr' rest (x:acc)
+    parseLabel' (C:rest) acc = (LabelId $ reverse acc,rest)
+    parseLabel' (A:rest) acc = parseLabel' rest (False:acc)
+    parseLabel' (B:rest) acc = parseLabel' rest (True:acc)
 
 makeNumber :: Num x => [Token] -> x
 makeNumber t
    | (last t) == A = makeNumber' (init t) 1
    | otherwise = -(makeNumber' (init t) 1)
   where
-     makeNumber' [] pow = 0
+     makeNumber' [] _ = 0
      makeNumber' (A:rest) pow = (makeNumber' rest (pow*2))
      makeNumber' (B:rest) pow = pow + (makeNumber' rest (pow*2))
 

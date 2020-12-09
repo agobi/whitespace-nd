@@ -1,4 +1,6 @@
-module VM where
+module Language.Whitespace.VM where
+
+import Language.Whitespace.Tokens
 
 import Data.Array
 import System.IO
@@ -35,7 +37,9 @@ data Op = Plus | Minus | Times | Divide | Modulo
 data Test = Zero | Negative
    deriving (Show,Eq)
 
-type Label = String
+newtype Label = LabelId { labelId :: [Bool] }
+    deriving (Show,Eq)
+
 type Loc = Integer
 
 type Program = [Instruction]
@@ -130,7 +134,8 @@ doInstr _ i = fail $ "Can't do " ++ show i
 findLabel :: Label -> Program -> IO Integer
 findLabel l p = findLabel' l p 0
 
-findLabel' l [] _ = fail $ "Undefined label (" ++ l ++ ")"
+findLabel' :: (MonadFail m) => Label -> Program -> Integer -> m Integer
+findLabel' l [] _ = fail $ "Undefined label (" ++ (show l) ++ ")"
 findLabel' m ((Label l):xs) i
     | l == m = return i
     | otherwise = findLabel' m xs (i+1)

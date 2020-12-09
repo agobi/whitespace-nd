@@ -9,10 +9,18 @@ Maintainer:          harold@hotelling.net
 Homepage:            https://github.com/haroldl/whitespace-nd
 Category:            Compilers/Interpreters
 Build-Type:          Simple
-Cabal-Version:       >=1.2
+Cabal-Version:       >=1.10
 Data-Files:          README.md examples/calc.ws examples/count.ws examples/fact.ws examples/hanoi.ws examples/hworld.ws examples/loctest.ws examples/name.ws examples/randperm.ws docs/tutorial.html emacs/whitespace-mode.el
-Extra-Source-Files:  VM.hs Tokens.hs Input.hs
+
+Library 
+  exposed-modules:   Language.Whitespace.Tokens
+                   , Language.Whitespace.Input
+                   , Language.Whitespace.VM
+  hs-source-dirs:    src
+  build-depends:     array, base, random
+  default-language:  Haskell2010
 
 Executable wspace
   Main-is:           main.hs
-  Build-Depends:     array, base, random
+  Build-Depends:     base, whitespace
+  default-language:  Haskell2010

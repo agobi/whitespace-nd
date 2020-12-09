@@ -1,4 +1,4 @@
-module Tokens where
+module Language.Whitespace.Tokens where
 
 data Token = A | B | C 
   deriving Eq
