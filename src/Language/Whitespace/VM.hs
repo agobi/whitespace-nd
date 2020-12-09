@@ -2,8 +2,6 @@
 
 module Language.Whitespace.VM where
 
-import Language.Whitespace.Tokens
-
 import GHC.Generics (Generic)
 import Data.Array
 import System.IO
