@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric, DeriveAnyClass, NamedFieldPuns #-}
 
 module Language.Whitespace.VM where
 
@@ -10,167 +10,162 @@ import Control.DeepSeq
 
 {- Stack machine for running whitespace programs -}
 
-data Instruction =
-       Push Integer
-     | Dup
-     | Ref Int
-     | Shuffle
-     | Slide Int
-     | Swap
-     | Discard
-     | Infix Op
-     | Store
-     | Retrieve
-     | Label Label
-     | Call Label
-     | Jump Label
-     | If Test Label
-     | Return
-     | OutputChar
-     | OutputNum
-     | ReadChar
-     | ReadNum
-     | End
-   deriving (Show,Eq,Generic,NFData)
+data Instruction
+    = Push Integer
+    | Dup
+    | Ref Int
+    | Shuffle
+    | Slide Int
+    | Swap
+    | Discard
+    | Infix Op
+    | Store
+    | Retrieve
+    | Label Label
+    | Call Label
+    | Jump Label
+    | If Test Label
+    | Return
+    | OutputChar
+    | OutputNum
+    | ReadChar
+    | ReadNum
+    | ErrNo
+    | End
+    deriving (Show, Eq, Generic, NFData)
 
 data Op = Plus | Minus | Times | Divide | Modulo
-   deriving (Show,Eq,Generic,NFData)
+   deriving (Show, Eq, Generic, NFData)
 
 data Test = Zero | Negative
-   deriving (Show,Eq,Generic,NFData)
+   deriving (Show, Eq, Generic, NFData)
 
 newtype Label = LabelId { labelId :: [Bool] }
-    deriving (Show,Eq,Generic,NFData)
+    deriving (Show, Eq, Generic, NFData)
 
 type Loc = Integer
 
 type Program = [Instruction]
 newtype Stack = Stack [Integer]
 type Heap = [Integer]
+newtype Addr = Addr Integer
 
-data VMState = VM {
-        program :: Program,
-	valstack :: Stack,
-	callstack :: Stack,
-	memory :: Heap,
-	pcounter :: Integer }
+data VMState = VM
+    { program :: Program
+    , valstack :: Stack
+    , callstack :: Stack
+    , memory :: Heap
+    , pcounter :: Int
+    }
 
 vm :: VMState -> IO ()
-vm (VM prog (Stack stack) cstack heap pc) = do
-  let instr = prog!!(fromInteger pc)
---  putStrLn (show stack)
-  doInstr (VM prog (Stack stack) cstack heap (pc+1)) instr
+vm vmState@VM{program, pcounter} = do
+    doInstr (vmState { pcounter = succ pcounter }) (program !! pcounter)
+
 
 -- Running individual instructions
-
 doInstr :: VMState -> Instruction -> IO ()
-doInstr (VM prog (Stack stack) cs heap pc) (Push n)
-    = vm (VM prog (Stack (n:stack)) cs heap pc)
-doInstr (VM prog (Stack (n:stack)) cs heap pc) Dup
-    = vm (VM prog (Stack (n:n:stack)) cs heap pc)
-doInstr (VM prog (Stack (stack)) cs heap pc) (Ref i)
-    = vm (VM prog (Stack ((stack!!i):stack)) cs heap pc)
-doInstr (VM prog (Stack stack) cs heap pc) Shuffle
-    = do shuffled <- shuffle stack
-	 vm (VM prog (Stack shuffled) cs heap pc)
-doInstr (VM prog (Stack (n:stack)) cs heap pc) (Slide i)
-    = vm (VM prog (Stack (n:(drop i stack))) cs heap pc)
-doInstr (VM prog (Stack (n:m:stack)) cs heap pc) Swap
-    = vm (VM prog (Stack (m:n:stack)) cs heap pc)
-doInstr (VM prog (Stack (n:stack)) cs heap pc) Discard
-    = vm (VM prog (Stack stack) cs heap pc)
-doInstr (VM prog (Stack (y:x:stack)) cs heap pc) (Infix op)
-    = vm (VM prog (Stack ((doOp op x y):stack)) cs heap pc)
-  where doOp Plus x y = x + y
-	doOp Minus x y = x - y
-	doOp Times x y = x * y
-	doOp Divide x y = x `div` y
-	doOp Modulo x y = x `mod` y
-doInstr (VM prog (Stack (n:stack)) cs heap pc) OutputChar
-    = do putChar (toEnum (fromInteger n))
-	 hFlush stdout
-	 vm (VM prog (Stack stack) cs heap pc)
-doInstr (VM prog (Stack (loc:stack)) cs heap pc) ReadChar
-    = do ch <- getChar
-	 hp <- store (toInteger (fromEnum ch)) loc heap
-	 vm (VM prog (Stack stack) cs hp pc)
-doInstr (VM prog (Stack (loc:stack)) cs heap pc) ReadNum
-    = do ch <- getLine
-	 let num = (read ch)::Integer
-	 hp <- store num loc heap
-	 vm (VM prog (Stack stack) cs hp pc)
-doInstr (VM prog (Stack (n:stack)) cs heap pc) OutputNum
-    = do putStr (show n)
-	 hFlush stdout
-	 vm (VM prog (Stack stack) cs heap pc)
-doInstr (VM prog stack cs heap pc) (Label _)
-    = vm (VM prog stack cs heap pc)
-doInstr (VM prog stack (Stack cs) heap pc) (Call l)
-    = do loc <- findLabel l prog
-	 vm (VM prog stack (Stack (pc:cs)) heap loc)
-doInstr (VM prog stack cs heap pc) (Jump l)
-    = do loc <- findLabel l prog
-	 vm (VM prog stack cs heap loc)
-doInstr (VM prog (Stack (n:stack)) cs heap pc) (If t l)
-    = do if (test t n)
-          then do loc <- findLabel l prog
-		  vm (VM prog (Stack stack) cs heap loc)
-	  else vm (VM prog (Stack stack) cs heap pc)
-  where test Zero n = n==0
-	test Negative n = n<0
-doInstr (VM prog stack (Stack (c:cs)) heap pc) Return
-    = vm (VM prog stack (Stack cs) heap c)
-doInstr (VM prog (Stack (n:loc:stack)) cs heap pc) Store
-    = do hp <- store n loc heap
-	 vm (VM prog (Stack stack) cs hp pc)
-doInstr (VM prog (Stack (loc:stack)) cs heap pc) Retrieve
-    = do val <- retrieve loc heap
-	 vm (VM prog (Stack (val:stack)) cs heap pc)
+doInstr state@VM{valstack = Stack valstack} instr = case instr of
+    Push n     | vs       <- valstack  -> withVStack (n:vs)
+    Dup        | v:vs     <- valstack  -> withVStack (v:v:vs)
+    Ref i      | vs       <- valstack  -> withVStack (vs!!i:vs)
+    Shuffle    | vs       <- valstack  -> shuffle vs >>= withVStack
+    Slide i    | v:vs     <- valstack  -> withVStack (v:drop i vs)
+    Swap       | v1:v2:vs <- valstack  -> withVStack (v2:v1:vs)
+    Discard    | _:vs     <- valstack  -> withVStack vs
+    Infix op   | v1:v2:vs <- valstack  -> withVStack (doOp op v2 v1:vs)
 
-doInstr (VM prog (Stack stack) cs heap pc) End
-       = return ()
-doInstr _ i = fail $ "Can't do " ++ show i
+    OutputChar | v:vs     <- valstack  -> writeChar v >> withVStack vs
+    OutputNum  | v:vs     <- valstack  -> writeNum  v >> withVStack vs
+    ReadChar   | v:vs     <- valstack  -> readChar >>= withVStackHeap vs . store (Addr v)
+    ReadNum    | v:vs     <- valstack  -> readNum  >>= withVStackHeap vs . store (Addr v)
 
--- Digging out labels from wherever they are
+    Label _                            -> vm state
+    End                                -> return ()
+    Call l                             -> do
+        loc <- findLabel l (program state)
+        let Stack cs = callstack state
+        let css = fromIntegral (pcounter state):cs
+        vm $ state{callstack=Stack css, pcounter=loc}
+    Jump l                             -> do
+        loc <- findLabel l (program state)
+        vm $ state{pcounter=loc}
+    If t l     | v:vs     <- valstack  ->
+        if test t v
+            then do
+                loc <- findLabel l (program state)
+                vm $ state{pcounter=loc, valstack=Stack vs}
+            else vm $ state{valstack=Stack vs}
+    Return                             -> do
+        let Stack(c:cs) = callstack state
+        vm $ state{callstack=Stack cs, pcounter=fromInteger c}
 
-findLabel :: Label -> Program -> IO Integer
-findLabel l p = findLabel' l p 0
+    Store      | v:loc:vs <- valstack  -> withVStackHeap vs $ store (Addr loc) v
+    Retrieve   | loc:vs   <- valstack  -> withVStack (retrieve (Addr loc) : vs)
 
-findLabel' :: (MonadFail m) => Label -> Program -> Integer -> m Integer
-findLabel' l [] _ = fail $ "Undefined label (" ++ (show l) ++ ")"
-findLabel' m ((Label l):xs) i
-    | l == m = return i
-    | otherwise = findLabel' m xs (i+1)
-findLabel' m (_:xs) i = findLabel' m xs (i+1)
+    _                                  ->
+         fail $ "Stack overflow execution instruction " ++ show instr
 
--- Heap management
+    where
+        withVStack vs = vm $ state {valstack = Stack vs}
+        withVStackHeap vs heap = vm $ state {valstack = Stack vs, memory=heap}
 
-retrieve :: Integer -> Heap -> IO Integer
-retrieve x heap = return (heap!!(fromInteger x))
+        -- Binary operators
+        doOp Plus x y = x + y
+        doOp Minus x y = x - y
+        doOp Times x y = x * y
+        doOp Divide x y = x `div` y
+        doOp Modulo x y = x `mod` y
 
-store :: Integer -> Integer -> Heap -> IO Heap
-store x 0 (h:hs) = return (x:hs)
-store x n (h:hs) = do hp <- store x (n-1) hs
-		      return (h:hp)
-store x 0 [] = return (x:[])
-store x n [] = do hp <- store x (n-1) []
-		  return (0:hp)
+        -- Heap operations
+        store :: Addr -> Integer -> Heap
+        store (Addr addr) value = store' addr (memory state)
+          where
+            store' 0 (_:hs) = value : hs
+            store' n (h:hs) = h : store' (n-1) hs
+            store' 0 []     = [value]
+            store' n []     = 0 : store' (n-1) []
 
--- Shuffling the stack
+        retrieve :: Addr -> Integer
+        retrieve (Addr x) = memory state !! fromInteger x
 
-shuffle :: [Integer] -> IO [Integer]
-shuffle nums = do shuffled <- shuffle' arr 1
-		  return $ elems shuffled
-  where arr = array (1, length nums) $ zip [1..] nums
+        -- IO
+        writeChar n = putChar (toEnum $ fromInteger n) >> hFlush stdout
+        writeNum n = putStr (show n) >> hFlush stdout
+        readChar = getChar >>= \ch -> return (toInteger $ fromEnum ch)
+        readNum = getLine >>= \ch -> return (read ch :: Integer)
 
-shuffle' :: Array Int Integer -> Int -> IO (Array Int Integer)
-shuffle' arr start = do
-   newIx <- randomRIO (start, end)
-   let (v1, v2) = (arr ! start, arr ! newIx)
-   -- putStrLn $ "Swapping " ++ (show (start, newIx))
-   let swapped = arr // [(start, v2), (newIx, v1)]
-   if start < (end - 1) then shuffle' swapped (start+1) else return arr
-  where end = snd $ bounds arr
+        -- Labels
+        findLabel :: Label -> Program -> IO Int
+        findLabel l p = case findLabel' p 0 of
+            Just i  -> return i
+            Nothing -> fail $ "Undefined label (" ++ show l ++ ")"
+          where
+            findLabel' :: Program -> Int -> Maybe Int
+            findLabel' []            _           = Nothing
+            findLabel' ((Label m):_) i | l == m  = Just i
+            findLabel' (_:xs)        i           = findLabel' xs (i+1)
+
+        test Negative = (< 0)
+        test Zero     = (== 0)
+
+        -- Shuffling the stack
+        shuffle :: [Integer] -> IO [Integer]
+        shuffle nums = do
+            shuffled <- shuffle' arr 1
+            return $ elems shuffled
+            where
+                arr = array (1, length nums) $ zip [1..] nums
+
+                shuffle' :: Array Int Integer -> Int -> IO (Array Int Integer)
+                shuffle' arr start = do
+                    newIx <- randomRIO (start, end)
+                    let (v1, v2) = (arr ! start, arr ! newIx)
+                    -- putStrLn $ "Swapping " ++ (show (start, newIx))
+                    let swapped = arr // [(start, v2), (newIx, v1)]
+                    if start < (end - 1) then shuffle' swapped (start+1) else return arr
+                    where
+                        end = snd $ bounds arr
 
 
 execute :: Program -> IO ()
