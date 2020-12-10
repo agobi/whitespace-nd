@@ -1,10 +1,10 @@
-module Language.Whitespace.Input where
+module Language.Whitespace.Binary where
 
 import Language.Whitespace.VM
 import Language.Whitespace.Tokens
 
 {- Input to the whitespace VM.
-   For convenience, three input characters 
+   For convenience, three input characters
        A => space, B => tab, C => either of CR/LF
 
 Numbers are binary (A=0, B=1, C=terminator)
@@ -48,13 +48,6 @@ We have:
      ReadNum       BB
 
 -}
-
-execute :: String -> IO ()
-execute fname = do
-   prog <- readFile fname
-   let tokens = tokenise prog
-   let runtime = parse tokens
-   vm (VM runtime (Stack []) (Stack []) [] 0)
 
 tokenise :: String -> [Token]
 tokenise [] = []
@@ -163,13 +156,13 @@ makeNumber t
 
 unParseNumber :: Integral a => a -> [Token] -> [Token]
 unParseNumber i c =
-  if i < 0 
+  if i < 0
     then B : writeNumber (negate i) c
     else A : writeNumber i c
-  where          
+  where
     writeNumber n c = writeNumber' n [C] ++ c
     writeNumber' 0 acc = acc
-    writeNumber' i acc = 
+    writeNumber' i acc =
       let (d, m) = i `divMod` 2
       in writeNumber' d $ (if m == 0 then A else B) : acc
 
@@ -180,3 +173,12 @@ unParseLabel s = writeLabel' (labelId s)
     writeLabel' (False:rest) c = A:writeLabel' rest c
     writeLabel' (True:rest)  c = B:writeLabel' rest c
 
+writeBinaryFile :: FilePath -> Program -> IO ()
+writeBinaryFile fname prg = do
+  writeFile fname $ concatMap show $ foldr unParse [] prg
+
+readBinaryFile :: FilePath -> IO Program
+readBinaryFile fname = do
+   prog <- readFile fname
+   let tokens = tokenise prog
+   return $ parse tokens

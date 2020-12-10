@@ -14,17 +14,25 @@ Data-Files:          README.md examples/calc.ws examples/count.ws examples/fact.
 
 Library 
   exposed-modules:   Language.Whitespace.Tokens
-                   , Language.Whitespace.Input
+                   , Language.Whitespace.Binary
                    , Language.Whitespace.VM
+                   , Language.Whitespace.Assembly
   hs-source-dirs:    src
-  build-depends:     array, base, random
+  build-depends:     array, base, random, megaparsec >= 9.0.0, text
+  ghc-options:       -W -Wall
   default-language:  Haskell2010
 
 Executable wspace
   Main-is:           main.hs
   Build-Depends:     base, whitespace
+  ghc-options:       -W -Wall
   default-language:  Haskell2010
 
+Executable wsasm
+  Main-is:           asm.hs
+  Build-Depends:     base, optparse-applicative, filepath, whitespace
+  ghc-options:       -W -Wall
+  default-language:  Haskell2010
 
 Test-Suite wsasm-test
   type:              exitcode-stdio-1.0

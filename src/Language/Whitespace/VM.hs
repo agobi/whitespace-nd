@@ -97,7 +97,7 @@ doInstr (VM prog (Stack (loc:stack)) cs heap pc) ReadNum
     = do ch <- getLine
 	 let num = (read ch)::Integer
 	 hp <- store num loc heap
-	 vm (VM prog (Stack stack) cs hp pc)	  
+	 vm (VM prog (Stack stack) cs hp pc)
 doInstr (VM prog (Stack (n:stack)) cs heap pc) OutputNum
     = do putStr (show n)
 	 hFlush stdout
@@ -128,7 +128,7 @@ doInstr (VM prog (Stack (loc:stack)) cs heap pc) Retrieve
 
 doInstr (VM prog (Stack stack) cs heap pc) End
        = return ()
-doInstr _ i = fail $ "Can't do " ++ show i 
+doInstr _ i = fail $ "Can't do " ++ show i
 
 -- Digging out labels from wherever they are
 
@@ -152,7 +152,7 @@ store x 0 (h:hs) = return (x:hs)
 store x n (h:hs) = do hp <- store x (n-1) hs
 		      return (h:hp)
 store x 0 [] = return (x:[])
-store x n [] = do hp <- store x (n-1) [] 
+store x n [] = do hp <- store x (n-1) []
 		  return (0:hp)
 
 -- Shuffling the stack
@@ -170,3 +170,8 @@ shuffle' arr start = do
    let swapped = arr // [(start, v2), (newIx, v1)]
    if start < (end - 1) then shuffle' swapped (start+1) else return arr
   where end = snd $ bounds arr
+
+
+execute :: Program -> IO ()
+execute program = do
+  vm (VM program (Stack []) (Stack []) [] 0)

@@ -1,17 +1,11 @@
 {-# LANGUAGE TemplateHaskell #-}
 
-import Test.Framework (defaultMain, testGroup)
-import Test.Framework.Providers.QuickCheck2 (testProperty)
-
 import Test.QuickCheck
 import Language.Whitespace.VM
-import Language.Whitespace.Input
-import Language.Whitespace.Tokens
+import Language.Whitespace.Binary
 import Test.QuickCheck.Arbitrary.Generic
 import System.Exit
-import Debug.Trace 
 
-import Test.QuickCheck.All
 
 instance Arbitrary Op where
   arbitrary = genericArbitrary
@@ -41,8 +35,8 @@ prop_label x = x == parsed && null rest
     code = unParseLabel x []
     (parsed, rest) = parseLabel code
 
-prop_reParse :: Instruction -> Bool
-prop_reParse inst = [ inst ] == parsed
+prop_instruction :: Instruction -> Bool
+prop_instruction inst = [ inst ] == parsed
   where
     code = unParse inst []
     parsed = parse code
