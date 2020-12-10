@@ -1,5 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 
+module BinarySpec where
+
 import Test.QuickCheck
 import Language.Whitespace.VM
 import Language.Whitespace.Binary
@@ -9,19 +11,19 @@ import System.Exit
 
 instance Arbitrary Op where
   arbitrary = genericArbitrary
-  shrink = genericShrink  
+  shrink = genericShrink
 
 instance Arbitrary Test where
   arbitrary = genericArbitrary
-  shrink = genericShrink  
+  shrink = genericShrink
 
 instance Arbitrary Label where
   arbitrary = genericArbitrary
-  shrink = genericShrink  
+  shrink = genericShrink
 
 instance Arbitrary Instruction where
   arbitrary = genericArbitrary
-  shrink = genericShrink  
+  shrink = genericShrink
 
 prop_number :: Integer -> Bool
 prop_number x = x == parsed && null rest
@@ -41,15 +43,3 @@ prop_instruction inst = [ inst ] == parsed
     code = unParse inst []
     parsed = parse code
 
-return []
-
-runTests :: IO Bool
-runTests = $quickCheckAll
-
-main :: IO ()
-main = do
-  -- add test runners into the array for each module
-  good <- and <$> sequence [runTests]
-  if good
-     then exitSuccess
-     else exitFailure
