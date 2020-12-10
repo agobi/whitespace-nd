@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
 
 module Language.Whitespace.VM where
 
@@ -6,6 +6,7 @@ import GHC.Generics (Generic)
 import Data.Array
 import System.IO
 import System.Random
+import Control.DeepSeq
 
 {- Stack machine for running whitespace programs -}
 
@@ -30,16 +31,16 @@ data Instruction =
      | ReadChar
      | ReadNum
      | End
-   deriving (Show,Eq,Generic)
+   deriving (Show,Eq,Generic,NFData)
 
 data Op = Plus | Minus | Times | Divide | Modulo
-   deriving (Show,Eq,Generic)
+   deriving (Show,Eq,Generic,NFData)
 
 data Test = Zero | Negative
-   deriving (Show,Eq,Generic)
+   deriving (Show,Eq,Generic,NFData)
 
 newtype Label = LabelId { labelId :: [Bool] }
-    deriving (Show,Eq,Generic)
+    deriving (Show,Eq,Generic,NFData)
 
 type Loc = Integer
 

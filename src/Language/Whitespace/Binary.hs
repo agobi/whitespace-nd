@@ -2,6 +2,10 @@ module Language.Whitespace.Binary where
 
 import Language.Whitespace.VM
 import Language.Whitespace.Tokens
+import System.IO
+import Control.Monad
+import Control.DeepSeq
+
 
 {- Input to the whitespace VM.
    For convenience, three input characters
@@ -173,12 +177,23 @@ unParseLabel s = writeLabel' (labelId s)
     writeLabel' (False:rest) c = A:writeLabel' rest c
     writeLabel' (True:rest)  c = B:writeLabel' rest c
 
+hWriteBinaryFile :: Handle -> Program -> IO ()
+hWriteBinaryFile h prg = do
+  forM_ (map show $ foldr unParse [] prg) (hPutStr h)
+
 writeBinaryFile :: FilePath -> Program -> IO ()
-writeBinaryFile fname prg = do
-  writeFile fname $ concatMap show $ foldr unParse [] prg
+writeBinaryFile fname prg =
+  withFile fname WriteMode $ \h -> do
+    hSetBuffering h LineBuffering
+    hWriteBinaryFile h prg
+
+hReadBinaryFile :: Handle -> IO Program
+hReadBinaryFile h = do
+  prog <- hGetContents h
+  let tokens = tokenise prog
+  return $!! parse tokens
 
 readBinaryFile :: FilePath -> IO Program
-readBinaryFile fname = do
-   prog <- readFile fname
-   let tokens = tokenise prog
-   return $ parse tokens
+readBinaryFile fname = withFile fname ReadMode $ \h -> do
+  hSetBuffering h LineBuffering
+  hReadBinaryFile h

@@ -13,7 +13,7 @@ import Control.Monad
 import Text.Megaparsec hiding (Label)
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
-
+import Control.DeepSeq
 
 decodeLabel :: Label -> String
 decodeLabel l = decodeBinary
@@ -127,23 +127,34 @@ asmStmt =
 
   <|> (asmLabelId >>= \l -> symbol ":" >>= \_ -> return (Label l))
 
+hReadAsmFile :: FilePath -> Handle -> IO (Either (ParseErrorBundle Text Void) Program)
+hReadAsmFile fname h = do
+  input <- TIO.hGetContents h
+  return $!! runParser asmParser fname input
+
 readAsmFile :: FilePath -> IO (Either (ParseErrorBundle Text Void) Program)
-readAsmFile fname = do
-  input <- TIO.readFile fname
-  return (runParser asmParser fname input)
+readAsmFile fname = withFile fname ReadMode $ \h -> do
+  hSetBuffering h LineBuffering
+  hReadAsmFile fname h
+
+hWriteAsmFile :: Handle -> Program -> IO ()
+hWriteAsmFile h prg = forM_ prg $ \t -> hPutStrLn h $ asmToken t
 
 writeAsmFile :: FilePath -> Program -> IO ()
-writeAsmFile fname prg = do
-  outH <- openFile fname WriteMode
-  forM_ prg $ \t -> do
-    hPutStrLn outH $ asmToken t
-  hClose outH
+writeAsmFile fname prg = withFile fname WriteMode $ \h -> do
+  hSetBuffering h LineBuffering
+  hWriteAsmFile h prg
+
+catchParseError :: Either (ParseErrorBundle Text Void) Program -> IO Program
+catchParseError (Right prg) = return prg
+catchParseError (Left e) = putStr (errorBundlePretty e) >> fail "Parse error"
 
 readAssemblyFile :: FilePath -> IO Program
 readAssemblyFile fname = do
   source <- readAsmFile fname
-  case source of
-    Right prg -> return prg
-    Left e    -> do
-      putStr (errorBundlePretty e)
-      fail "Parse error"
+  catchParseError source
+
+hReadAssemblyFile :: FilePath -> Handle -> IO Program
+hReadAssemblyFile fname h = do
+  source <- hReadAsmFile fname h
+  catchParseError source
