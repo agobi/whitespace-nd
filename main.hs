@@ -22,24 +22,35 @@
 
 module Main where
 
-import Language.Whitespace.Binary
-import Language.Whitespace.VM
-import Language.Whitespace.Tokens
+import Language.Whitespace.Binary (readBinaryFile)
+import Language.Whitespace.Assembly (readAssemblyFile)
+import Language.Whitespace.VM (execute)
+import System.FilePath.Posix
+import Options.Applicative
 
-import System.Environment(getArgs)
+
+data MainArgs = MainArgs
+  { wss :: Bool
+  , inputFile :: FilePath
+  }
+  deriving (Show)
+
+mainArgs :: Parser MainArgs
+mainArgs = MainArgs
+  <$> switch (short 's' <> long "source" <> help "input is whitespace source file")
+  <*> strArgument (metavar "INPUT" <> help "input file")
+
+
+run :: MainArgs -> IO ()
+run args = do
+  runtime <- (if source then readAssemblyFile else readBinaryFile) (inputFile args)
+  execute runtime
+  where
+    source = wss args || takeExtension (inputFile args) == "wss"
 
 
 main :: IO ()
-main = do
-  args <- getArgs
-  if (length args)/=1
-    then usage
-	  else do
-      runtime <- readBinaryFile (head args)
-      execute runtime
-
-usage :: IO ()
-usage = do
-	putStrLn "wspace 0.4 (c) 2003 Edwin Brady"
-	putStrLn "-------------------------------"
-	putStrLn "Usage: wspace [file]"
+main = run =<< execParser opts
+  where
+    opts = info (mainArgs <**> helper)
+      ( fullDesc <> header "wspace 0.4 (c) 2003 Edwin Brady" )

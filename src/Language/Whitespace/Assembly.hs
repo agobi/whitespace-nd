@@ -125,10 +125,11 @@ asmStmt =
   <|> (symbol "outn" >> return OutputNum)
   <|> (symbol "outc" >> return OutputChar)
 
+  <|> (asmLabelId >>= \l -> symbol ":" >>= \_ -> return (Label l))
+
 readAsmFile :: FilePath -> IO (Either (ParseErrorBundle Text Void) Program)
 readAsmFile fname = do
   input <- TIO.readFile fname
-  parseTest asmParser input
   return (runParser asmParser fname input)
 
 writeAsmFile :: FilePath -> Program -> IO ()
@@ -138,3 +139,11 @@ writeAsmFile fname prg = do
     hPutStrLn outH $ asmToken t
   hClose outH
 
+readAssemblyFile :: FilePath -> IO Program
+readAssemblyFile fname = do
+  source <- readAsmFile fname
+  case source of
+    Right prg -> return prg
+    Left e    -> do
+      putStr (errorBundlePretty e)
+      fail "Parse error"

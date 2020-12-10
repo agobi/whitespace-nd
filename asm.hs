@@ -1,6 +1,6 @@
 import Options.Applicative
 import System.FilePath.Posix
-import Language.Whitespace.Assembly (readAsmFile, writeAsmFile)
+import Language.Whitespace.Assembly (readAssemblyFile, writeAsmFile)
 import Language.Whitespace.Binary (readBinaryFile, writeBinaryFile)
 
 
@@ -19,7 +19,7 @@ mainArgs = MainArgs
 
 assembler :: FilePath -> FilePath -> IO ()
 assembler inF outF = do
-   Right prog <- readAsmFile inF
+   prog <- readAssemblyFile inF
    writeBinaryFile outF prog
 
 
