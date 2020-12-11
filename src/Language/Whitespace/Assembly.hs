@@ -30,6 +30,7 @@ decodeArg num =
 
 asmToken :: Instruction -> String
 asmToken (Push arg)          = "    push " ++ decodeArg arg
+asmToken PushE               = "    pushe"
 asmToken Dup                 = "    dup"
 asmToken (Ref arg)           = "    copy " ++ show arg
 asmToken Shuffle             = "    shuffle"
@@ -84,7 +85,7 @@ asmParser = do
 
 asmLine :: Parser (Maybe Instruction)
 asmLine = do
-  hspace
+  sc
   stmt <- (asmStmt >>= return . Just) <|> (hspace >> return Nothing)
   return stmt
 
@@ -96,7 +97,8 @@ asmLabelId = do
 
 asmStmt :: Parser Instruction
 asmStmt =
-  (symbol "push" >> integer >>= return . Push)
+  (symbol "pushe" >> return PushE)
+  <|> (symbol "push" >> integer >>= return . Push)
   <|> (symbol "dup" >> return Dup)
   <|> (symbol "copy" >> integer >>= return . Ref . fromInteger)
   <|> (symbol "shuffle" >> return Shuffle)

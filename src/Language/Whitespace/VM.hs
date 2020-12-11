@@ -5,6 +5,7 @@ module Language.Whitespace.VM where
 import GHC.Generics (Generic)
 import Data.Array
 import System.IO
+import System.IO.Error
 import System.Random
 import Control.DeepSeq
 
@@ -12,6 +13,7 @@ import Control.DeepSeq
 
 data Instruction
     = Push Integer
+    | PushE
     | Dup
     | Ref Int
     | Shuffle
@@ -30,7 +32,6 @@ data Instruction
     | OutputNum
     | ReadChar
     | ReadNum
-    | ErrNo
     | End
     deriving (Show, Eq, Generic, NFData)
 
@@ -55,12 +56,20 @@ data VMState = VM
     , valstack :: Stack
     , callstack :: Stack
     , memory :: Heap
+    , errno :: Int
     , pcounter :: Int
     }
 
 vm :: VMState -> IO ()
 vm vmState@VM{program, pcounter} = do
-    doInstr (vmState { pcounter = succ pcounter }) (program !! pcounter)
+    let instr = program !! pcounter
+    -- let Stack stack = valstack vmState
+    -- putStrLn "---"
+    -- putStrLn $ "MEMORY: " ++ show (memory vmState)
+    -- putStrLn $ "STACK:  " ++ show stack
+    -- putStrLn $ "STATUS: " ++ show (errno vmState)
+    -- putStrLn $ show pcounter ++ ": " ++ show instr
+    doInstr (vmState { pcounter = succ pcounter }) instr
 
 
 -- Running individual instructions
@@ -77,8 +86,10 @@ doInstr state@VM{valstack = Stack valstack} instr = case instr of
 
     OutputChar | v:vs     <- valstack  -> writeChar v >> withVStack vs
     OutputNum  | v:vs     <- valstack  -> writeNum  v >> withVStack vs
-    ReadChar   | v:vs     <- valstack  -> readChar >>= withVStackHeap vs . store (Addr v)
-    ReadNum    | v:vs     <- valstack  -> readNum  >>= withVStackHeap vs . store (Addr v)
+    ReadChar   | v:vs     <- valstack  -> saveIOResult (Addr v) (Stack vs) readChar
+    ReadNum    | v:vs     <- valstack  -> saveIOResult (Addr v) (Stack vs) readNum
+    PushE      | vs       <- valstack  -> vm $ state {valstack=Stack (err:vs), errno=0}
+        where err=fromIntegral (errno state)
 
     Label _                            -> vm state
     End                                -> return ()
@@ -100,15 +111,15 @@ doInstr state@VM{valstack = Stack valstack} instr = case instr of
         let Stack(c:cs) = callstack state
         vm $ state{callstack=Stack cs, pcounter=fromInteger c}
 
-    Store      | v:loc:vs <- valstack  -> withVStackHeap vs $ store (Addr loc) v
     Retrieve   | loc:vs   <- valstack  -> withVStack (retrieve (Addr loc) : vs)
+    Store      | v:loc:vs <- valstack  ->
+        vm $ state {valstack = Stack vs, memory=store (Addr loc) v}
 
     _                                  ->
          fail $ "Stack overflow execution instruction " ++ show instr
 
     where
         withVStack vs = vm $ state {valstack = Stack vs}
-        withVStackHeap vs heap = vm $ state {valstack = Stack vs, memory=heap}
 
         -- Binary operators
         doOp Plus x y = x + y
@@ -135,6 +146,17 @@ doInstr state@VM{valstack = Stack valstack} instr = case instr of
         readChar = getChar >>= \ch -> return (toInteger $ fromEnum ch)
         readNum = getLine >>= \ch -> return (read ch :: Integer)
 
+        saveIOResult :: Addr -> Stack -> IO Integer -> IO ()
+        saveIOResult addr stack ioOp = catchIOError io $ \err -> do
+            if isEOFError err
+                then vm $ state{valstack=stack, errno=1}
+                else ioError err
+          where
+            io = do
+                result <- ioOp
+                vm $ state{valstack=stack, memory=store addr result, errno=0}
+
+
         -- Labels
         findLabel :: Label -> Program -> IO Int
         findLabel l p = case findLabel' p 0 of
@@ -154,7 +176,7 @@ doInstr state@VM{valstack = Stack valstack} instr = case instr of
         shuffle nums = do
             shuffled <- shuffle' arr 1
             return $ elems shuffled
-            where
+              where
                 arr = array (1, length nums) $ zip [1..] nums
 
                 shuffle' :: Array Int Integer -> Int -> IO (Array Int Integer)
@@ -163,11 +185,13 @@ doInstr state@VM{valstack = Stack valstack} instr = case instr of
                     let (v1, v2) = (arr ! start, arr ! newIx)
                     -- putStrLn $ "Swapping " ++ (show (start, newIx))
                     let swapped = arr // [(start, v2), (newIx, v1)]
-                    if start < (end - 1) then shuffle' swapped (start+1) else return arr
-                    where
+                    if start < (end - 1)
+                        then shuffle' swapped (start+1)
+                        else return arr
+                      where
                         end = snd $ bounds arr
 
 
 execute :: Program -> IO ()
 execute program = do
-  vm (VM program (Stack []) (Stack []) [] 0)
+  vm (VM program (Stack []) (Stack []) [] 0 0)

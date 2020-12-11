@@ -50,6 +50,7 @@ We have:
      OutputNum     AB
      ReadChar      BA
      ReadNum       BB
+     PushE         CC
 
 -}
 
@@ -100,6 +101,7 @@ parse (B:C:A:A:xs) = OutputChar:(parse xs)
 parse (B:C:A:B:xs) = OutputNum:(parse xs)
 parse (B:C:B:A:xs) = ReadChar:(parse xs)
 parse (B:C:B:B:xs) = ReadNum:(parse xs)
+parse (B:C:C:C:xs) = PushE:(parse xs)
 
 parse _ = error "Unrecognised input"
 
@@ -133,6 +135,7 @@ unParse OutputChar          c = B:C:A:A:c
 unParse OutputNum           c = B:C:A:B:c
 unParse ReadChar            c = B:C:B:A:c
 unParse ReadNum             c = B:C:B:B:c
+unParse PushE               c = B:C:C:C:c
 
 
 parseNumber :: Num x => [Token] -> (x, [Token])
